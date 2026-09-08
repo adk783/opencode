@@ -1,0 +1,43 @@
+name: sync-fork
+
+# Keeps this fork's dev branch level with anomalyco/opencode.
+#
+# Merge rather than fast-forward: the fork carries its own commits (this
+# workflow among them), so a fast-forward would refuse. A merge conflict
+# fails the job loudly, which is the point: a silent stale fork is worse
+# than an email.
+#
+# GitHub disables a scheduled workflow after 60 days of repository
+# inactivity. Upstream pushes most days, so the sync commit it produces is
+# itself the activity that keeps this alive.
+
+on:
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Merge upstream dev
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/anomalyco/opencode.git
+          git fetch upstream dev
+          if git merge-base --is-ancestor upstream/dev HEAD; then
+            echo "Already level with upstream, nothing to do."
+            exit 0
+          fi
+          git merge --no-edit upstream/dev
+          git push origin dev
